@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import javax.crypto.Cipher;
@@ -16,10 +17,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.example.demo.repositories.UserRepository;
+import com.example.demo.services.Interfaces.IUserService;
 import com.example.demo.models.User;
 
 @Service
-public class UserService {
+public class UserService implements IUserService{
 
   @Autowired
   UserRepository userRepository;
@@ -106,6 +108,49 @@ public class UserService {
     return userRepository.existsByTaxId(taxId);
   }
 
+  public Optional<User> updateUser(String id, User userUpdates) {
+    Optional<User> existingUser = userRepository.findById(id);
+
+    if (existingUser.isEmpty()) {
+      throw new RuntimeException("User not found");
+    }
+
+    User userFound = existingUser.get();
+    
+    if (userUpdates.getEmail() != null && !userUpdates.getEmail().isBlank()) {
+      userFound.setEmail(userUpdates.getEmail());
+    }
+    
+    if (userUpdates.getName() != null && !userUpdates.getName().isBlank()) {
+      userFound.setName(userUpdates.getName());
+    }
+    
+    if (userUpdates.getPhone() != null && !userUpdates.getPhone().isBlank()) {
+      userFound.setPhone(userUpdates.getPhone());
+    }
+    
+    if (userUpdates.getTaxId() != null && !userUpdates.getTaxId().isBlank()) {        
+      if (!userFound.getTaxId().equals(userUpdates.getTaxId()) && existsByTaxId(userUpdates.getTaxId())) {
+        throw new RuntimeException("RFC already created");
+      }
+      userFound.setTaxId(userUpdates.getTaxId());
+    }
+    
+    User updatedUser = userRepository.save(userFound);
+        
+    updatedUser.setPassword(null);
+    
+    return Optional.ofNullable(updatedUser);
+  }
+
+  public void deleteUser(String id) {    
+    if (!userRepository.existsById(id)) {
+      throw new RuntimeException("User not found: " + id);
+    }
+    
+    userRepository.deleteById(id);
+  }
+
   public byte[] encryptPassword(String password) {
     try {
       SecretKeySpec key = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "AES");
@@ -126,7 +171,7 @@ public class UserService {
       return encryptedWithIv;
 
     } catch (Exception e) {
-      throw new RuntimeException("Error al encriptar la contraseña: " + e.getMessage(), e);
+      throw new RuntimeException("Error encrypting password: " + e.getMessage(), e);
     }
   }
 
