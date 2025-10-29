@@ -24,7 +24,11 @@ API Spring con Java 17 - prueba técnica
    ```bash
    mvn clean install
 
-3. Para ejecutar los endpoints se puede acceder a la ruta:
+3. Ejecutar el proyecto
+   ```bash
+   mvn spring-boot:run
+
+4. Para ejecutar los endpoints se puede acceder a la ruta:
   - http://localhost:8080/swagger-ui/index.html
 
   - También se tiene acceso al workspace dentro de postman con el siguiente link:
