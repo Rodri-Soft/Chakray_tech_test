@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.models.Response;
 import com.example.demo.models.User;
+import com.example.demo.models.dto.SaveUserDTO;
+import com.example.demo.models.dto.UpdateUserDTO;
+import com.example.demo.services.UserValidator;
 import com.example.demo.services.Interfaces.IUserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -89,20 +92,15 @@ public class UserController {
   }
 
   @PostMapping("/save")
-  public ResponseEntity<Response> saveUser(@RequestBody User user) {
+  public ResponseEntity<Response> saveUser(@RequestBody SaveUserDTO user) {
 
     Response response = new Response();
 
     try {
 
-      if (user.getEmail() == null || user.getEmail().isBlank()) {
-        response.message = "Email required";
-        return ResponseEntity.badRequest().body(response);
-      }
-      if (user.getTaxId() == null || user.getTaxId().isBlank()) {
-        response.message = "Tax_id required";
-        return ResponseEntity.badRequest().body(response);
-      }
+      UserValidator userValidator = new UserValidator();
+      userValidator.validateSaveUserDTO(user);
+
       if (userService.existsByTaxId(user.getTaxId())) {
         response.message = "RFC already created";
         return ResponseEntity.badRequest().body(response);
@@ -120,26 +118,33 @@ public class UserController {
     }
   }
 
-  @PatchMapping("/{id}")
-  @Operation(summary = "Update user", description = "Update user")
-  public ResponseEntity<Response> patchUser(@PathVariable String id, @RequestBody User user) {
-    
+@PatchMapping("/{id}")
+  public ResponseEntity<Response> updateUser(@RequestBody UpdateUserDTO user, @PathVariable String id) {
+
     Response response = new Response();
-    try {      
-      Optional<User> updatedUser = userService.updateUser(id, user);
+
+    try {
+
+      UserValidator userValidator = new UserValidator();
+      userValidator.validateUpdateUserDTO(user);
+
+      Optional<User> userOptional = userService.updateUser(id, user);
+      if (userOptional.isEmpty()) {
+        response.message = "User not found";
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+      }
+
       response.message = "User updated correctly";
-      response.data = updatedUser;
+      response.data = userOptional.get();
       return ResponseEntity.ok(response);
 
-    } catch (RuntimeException e) {
-      response.message = e.getMessage();
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-
     } catch (Exception e) {
-      response.message = "Error updating user: " + e.getMessage();
+      response.message = e.getMessage();
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+
     }
   }
+
 
   @DeleteMapping("/{id}")
   @Operation(summary = "Delete user by ID")

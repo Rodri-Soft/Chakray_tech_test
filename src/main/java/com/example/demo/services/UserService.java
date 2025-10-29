@@ -3,6 +3,7 @@ package com.example.demo.services;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +19,12 @@ import org.springframework.stereotype.Service;
 
 import com.example.demo.repositories.UserRepository;
 import com.example.demo.services.Interfaces.IUserService;
+
+import jakarta.transaction.Transactional;
+
 import com.example.demo.models.User;
+import com.example.demo.models.dto.SaveUserDTO;
+import com.example.demo.models.dto.UpdateUserDTO;
 
 @Service
 public class UserService implements IUserService{
@@ -57,7 +63,14 @@ public class UserService implements IUserService{
         .toList();
   }
 
-  public User saveUser(User user) {
+  public User saveUser(SaveUserDTO userDto) {  
+
+    User user = User.builder()
+        .email(userDto.getEmail())
+        .name(userDto.getName())
+        .phone(userDto.getPhone())
+        .taxId(userDto.getTaxId())        
+        .build();
 
     user.setPassword(encryptPassword(defaultPassword));
 
@@ -108,39 +121,36 @@ public class UserService implements IUserService{
     return userRepository.existsByTaxId(taxId);
   }
 
-  public Optional<User> updateUser(String id, User userUpdates) {
-    Optional<User> existingUser = userRepository.findById(id);
+  @Transactional
+  public Optional<User> updateUser(String id, UpdateUserDTO dto) {
 
-    if (existingUser.isEmpty()) {
+    Optional<User> userOptional = userRepository.findById(id);
+    if (userOptional.isEmpty()) {
       throw new RuntimeException("User not found");
     }
 
-    User userFound = existingUser.get();
-    
-    if (userUpdates.getEmail() != null && !userUpdates.getEmail().isBlank()) {
-      userFound.setEmail(userUpdates.getEmail());
-    }
-    
-    if (userUpdates.getName() != null && !userUpdates.getName().isBlank()) {
-      userFound.setName(userUpdates.getName());
-    }
-    
-    if (userUpdates.getPhone() != null && !userUpdates.getPhone().isBlank()) {
-      userFound.setPhone(userUpdates.getPhone());
-    }
-    
-    if (userUpdates.getTaxId() != null && !userUpdates.getTaxId().isBlank()) {        
-      if (!userFound.getTaxId().equals(userUpdates.getTaxId()) && existsByTaxId(userUpdates.getTaxId())) {
-        throw new RuntimeException("RFC already created");
+    return userOptional.map(user -> {
+      if (dto.getEmail() != null)
+        user.setEmail(dto.getEmail());
+      if (dto.getName() != null)
+        user.setName(dto.getName());
+      if (dto.getPhone() != null)
+        user.setPhone(dto.getPhone());
+      if (dto.getTaxId() != null)
+        user.setTaxId(dto.getTaxId());
+
+      if (dto.getOldPassword() != null && dto.getNewPassword() != null) {
+
+        String userPassword = decryptPassword(user.getPassword());
+
+        if (!dto.getOldPassword().equals(userPassword)) {
+          throw new RuntimeException("Old password is incorrect");
+        }
+        user.setPassword(encryptPassword(dto.getNewPassword()));
       }
-      userFound.setTaxId(userUpdates.getTaxId());
-    }
-    
-    User updatedUser = userRepository.save(userFound);
-        
-    updatedUser.setPassword(null);
-    
-    return Optional.ofNullable(updatedUser);
+
+      return userRepository.save(user);
+    });
   }
 
   public void deleteUser(String id) {    
@@ -175,4 +185,27 @@ public class UserService implements IUserService{
     }
   }
 
+  public String decryptPassword(byte[] encryptedWithIv) {
+    try {
+
+      byte[] iv = Arrays.copyOfRange(encryptedWithIv, 0, 12);
+
+      byte[] encrypted = Arrays.copyOfRange(encryptedWithIv, 12, encryptedWithIv.length);
+
+      SecretKeySpec key = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "AES");
+      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+      GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+
+      cipher.init(Cipher.DECRYPT_MODE, key, spec);
+
+      byte[] decrypted = cipher.doFinal(encrypted);
+      return new String(decrypted, StandardCharsets.UTF_8);
+
+    } catch (Exception e) {
+      throw new RuntimeException("Error al desencriptar la contraseña: " + e.getMessage(), e);
+    }
+  }
+
 }
+
+
