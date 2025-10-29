@@ -16,4 +16,5 @@ public interface IUserService {
   User saveUser(SaveUserDTO user);
   Optional<User> updateUser(String id, UpdateUserDTO dto);
   void deleteUser(String id);
+  User logInUser(String taxId, String password);
 }

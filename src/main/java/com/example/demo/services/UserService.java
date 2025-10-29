@@ -206,6 +206,24 @@ public class UserService implements IUserService{
     }
   }
 
+  public User logInUser(String taxId, String password) {
+    Optional<User> userOptional = userRepository.findByTaxId(taxId);
+    if (userOptional.isEmpty()) {
+        throw new RuntimeException("Invalid credentials");
+    }
+
+    User user = userOptional.get();
+
+    String decryptedPassword = decryptPassword(user.getPassword());
+
+    if (!decryptedPassword.equals(password)) {
+        throw new RuntimeException("Invalid credentials");
+    }
+
+    user.setPassword(null);
+    return user;
+}
+
 }
 
 

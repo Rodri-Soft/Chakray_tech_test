@@ -18,12 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.models.Response;
 import com.example.demo.models.User;
+import com.example.demo.models.dto.LogInDTO;
 import com.example.demo.models.dto.SaveUserDTO;
 import com.example.demo.models.dto.UpdateUserDTO;
 import com.example.demo.services.UserValidator;
 import com.example.demo.services.Interfaces.IUserService;
 
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
@@ -118,7 +118,7 @@ public class UserController {
     }
   }
 
-@PatchMapping("/{id}")
+  @PatchMapping("/{id}")
   public ResponseEntity<Response> updateUser(@RequestBody UpdateUserDTO user, @PathVariable String id) {
 
     Response response = new Response();
@@ -146,8 +146,7 @@ public class UserController {
   }
 
 
-  @DeleteMapping("/{id}")
-  @Operation(summary = "Delete user by ID")
+  @DeleteMapping("/{id}")  
   public ResponseEntity<Response> deleteUser(@PathVariable String id) {
     Response response = new Response();
     try {
@@ -161,6 +160,31 @@ public class UserController {
 
     } catch (Exception e) {      
       response.message = "Error deleting user: " + e.getMessage();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+  }
+
+  @PostMapping("/login")
+  public ResponseEntity<Response> login(@RequestBody LogInDTO logInDTO) {
+
+    Response response = new Response();
+
+    try {
+        
+      UserValidator userValidator = new UserValidator();
+      userValidator.validateLogInDTO(logInDTO);
+
+      User user = userService.logInUser(logInDTO.getTaxId(), logInDTO.getPassword());
+      response.message = "Login successful";
+      response.data = user;
+
+      return ResponseEntity.ok(response);
+
+    } catch (RuntimeException e) {
+      response.message = e.getMessage();
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    } catch (Exception e) {
+      response.message = "Error during login: " + e.getMessage();
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
   }
